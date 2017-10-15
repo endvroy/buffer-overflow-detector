@@ -204,20 +204,17 @@ public:
                 candidates.push_back(l1.smul_ov(r2, ofFlags[1]));
                 candidates.push_back(r1.smul_ov(l2, ofFlags[2]));
                 candidates.push_back(r1.smul_ov(r2, ofFlags[3]));
-
                 for (auto of:ofFlags) {
                     if (of) {
                         return infRange();
                     }
                 }
-
                 auto max = candidates[0];
                 for (auto &x : candidates) {
                     if (x.sgt(max)) {
                         max = x;
                     }
                 }
-
                 auto min = candidates[0];
                 for (auto &x : candidates) {
                     if (x.slt(min)) {
@@ -227,8 +224,46 @@ public:
                 return makeRange(context, min, max);
             }
             else if (opcode == Instruction::SDiv) {
-                // todo: fill in
-                return infRange();
+                if (l2.isNegative() && r2.isStrictlyPositive()) {
+                    auto abs1 = l1.abs();
+                    auto abs2 = r1.abs();
+                    auto abs = abs1.sgt(abs2) ? abs1 : abs2;
+                    APInt l(abs);
+                    l.flipAllBits();
+                    ++l;
+                    return makeRange(context, l, abs);
+                }
+                else {
+                    SmallVector<APInt, 4> candidates;
+                    bool ofFlags[4];
+                    candidates.push_back(l1.sdiv_ov(l2, ofFlags[0]));
+                    candidates.push_back(l1.sdiv_ov(r2, ofFlags[1]));
+                    candidates.push_back(r1.sdiv_ov(l2, ofFlags[2]));
+                    candidates.push_back(r1.sdiv_ov(r2, ofFlags[3]));
+                    for (auto of:ofFlags) {
+                        if (of) {
+                            return infRange();
+                        }
+                    }
+                    auto max = candidates[0];
+                    for (auto &x : candidates) {
+                        if (x.sgt(max)) {
+                            max = x;
+                        }
+                    }
+                    auto min = candidates[0];
+                    for (auto &x : candidates) {
+                        if (x.slt(min)) {
+                            min = x;
+                        }
+                    }
+                    return makeRange(context, min, max);
+                }
+            }
+            else if (opcode == Instruction::UDiv) {
+                auto l = r1.udiv(l2);
+                auto r = l1.udiv(r2);
+                return makeRange(context, l, r);
             }
             else {
                 // todo: fill in

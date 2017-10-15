@@ -15,7 +15,7 @@
 #
 
 OVERFLOWER   := ../../overflowerbuild/bin/overflower
-LLVM_PATH    :=
+LLVM_PATH    := /home/roy/Documents/llvm/bin/
 CLANG        := $(LLVM_PATH)clang
 OPT          := $(LLVM_PATH)opt
 RM           := /bin/rm
