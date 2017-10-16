@@ -339,32 +339,7 @@ void printRange(RangeValue &rangeValue) {
         outs() << "unknown" << "\n";
     }
     else {
-        outs() << rangeValue.lvalue->getValue() << ":" << rangeValue.rvalue->getValue() << "\n";
-    }
-}
-
-void
-printPotentialOf(RangeResult &rangeStates) {
-    for (auto &valueStatePair : rangeStates) {
-        auto *inst = llvm::dyn_cast<llvm::GetElementPtrInst>(valueStatePair.first);
-        if (!inst) {
-            continue;
-        }
-
-        auto &state = analysis::getIncomingState(rangeStates, *inst);
-        auto index = inst->getOperand(2);
-        auto constant = dyn_cast<Constant>(index);
-        if (constant) {
-            outs() << *constant << "\n";
-        }
-        else {
-            //  todo: fill in
-//            outs() << index;
-            outs() << "index range\n";
-            auto &rangeValue = state[index];
-            printRange(rangeValue);
-        }
-//        llvm::outs() << "\n\n";
+        outs() << rangeValue.lvalue->getValue() << ":" << rangeValue.rvalue->getValue();
     }
 }
 
@@ -426,10 +401,94 @@ int main(int argc, char **argv) {
     Analysis analysis{*module, mainFunction};
     auto results = analysis.computeForwardDataflow();
 
-    for (auto & [context, contextResults] : results) {
-        for (auto & [function, functionResults] : contextResults) {
-            debugPrint(functionResults);
-            printPotentialOf(functionResults);
+    for (auto & [ctxt, contextResults] : results) {
+        for (auto & [function, rangeStates] : contextResults) {
+//            debugPrint(rangeStates);
+
+            for (auto &valueStatePair : rangeStates) {
+                auto *inst = llvm::dyn_cast<llvm::GetElementPtrInst>(valueStatePair.first);
+                if (!inst) {
+                    continue;
+                }
+                auto &state = analysis::getIncomingState(rangeStates, *inst);
+                Type *type = cast<PointerType>(
+                        cast<GetElementPtrInst>(inst)->getPointerOperandType())->getElementType();
+                auto arrayTy = cast<ArrayType>(type);
+                auto size = arrayTy->getNumElements();
+                auto elmtTy = arrayTy->getElementType();
+                auto &layout = module->getDataLayout();
+                auto numBytes = layout.getTypeAllocSize(arrayTy);
+                auto elmtBytes = layout.getTypeAllocSize(elmtTy);
+
+                auto index = inst->getOperand(2);
+                auto constant = dyn_cast<ConstantInt>(index);
+                if (constant) {
+                    if (constant->isNegative() || constant->uge(size)) {
+                        // print context
+                        bool first = true;
+                        for (Instruction *c_instr: ctxt) {
+                            if (c_instr) {
+                                auto loc = c_instr->getDebugLoc().getLine();
+                                if (first) {
+                                    first = false;
+                                    outs() << loc;
+                                }
+                                else {
+                                    outs() << ':' << loc;
+                                }
+                            }
+                        }
+                        outs() << ", ";
+                        // print fn name
+                        outs() << function->getName().str() << ", ";
+                        //print line
+                        outs() << inst->getDebugLoc().getLine() << ", ";
+                        //print buf bytes
+                        outs() << numBytes << ", ";
+                        //print indices
+                        auto x = (int64_t) constant->getValue().getLimitedValue() * elmtBytes;
+                        outs() << x << ':' << x << '\n';
+                    }
+                }
+                else {
+                    auto &rangeValue = state[index];
+                    if (rangeValue.isUnknown() ||
+                        rangeValue.isInfinity() ||
+                        rangeValue.lvalue->isNegative() ||
+                        rangeValue.rvalue->uge(size)) {
+                        // print context
+                        bool first = true;
+                        for (Instruction *c_instr: ctxt) {
+                            if (c_instr) {
+                                auto loc = c_instr->getDebugLoc().getLine();
+                                if (first) {
+                                    first = false;
+                                    outs() << loc;
+                                }
+                                else {
+                                    outs() << ':' << loc;
+                                }
+                            }
+                        }
+                        outs() << ", ";
+                        // print fn name
+                        outs() << function->getName().str() << ", ";
+                        //print line
+                        outs() << inst->getDebugLoc().getLine() << ", ";
+                        //print buf bytes
+                        outs() << numBytes << ", ";
+                        //print indices
+                        if (rangeValue.isInfinity() || rangeValue.isUnknown()) {
+                            outs() << "-inf:inf\n";
+                        }
+                        else {
+                            auto l = (int64_t) rangeValue.lvalue->getLimitedValue();
+                            auto r = (int64_t) rangeValue.rvalue->getLimitedValue();
+                            outs() << l * (int64_t) elmtBytes << ':' << r * (int64_t) elmtBytes << '\n';
+                        }
+                    }
+                }
+            }
         }
     }
 
