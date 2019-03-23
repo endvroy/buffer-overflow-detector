@@ -1,10 +1,8 @@
-This is a template for a project to help teach how to implement a static
-dataflow analysis inside LLVM. It involves computing the possible ranges of
-values for variables and using these ranges to identify potential buffer
-overflows.
+Detecting potential buffer overflows with dataflow analysis.
+It involves computing the possible ranges of values for variables and using these ranges to identify potential buffer overflows.
+The project is implemented in LLVM.
 
-Building with CMake
-==============================================
+# Building the tool
 1. Create a new directory for building.
 
         mkdir overflowerbuild
@@ -22,13 +20,9 @@ Building with CMake
 
         make
 
-This produces a tool called `bin/overflower`.
+The built tool called `bin/overflower`.
 
-Note, building with a tool like ninja can be done by adding `-G Ninja` to
-the cmake invocation and running ninja instead of make.
-
-Running
-==============================================
+# Running the tool
 
 First suppose that you have a program compiled to bitcode:
 
@@ -38,9 +32,7 @@ Running the overflow analyzer:
 
     bin/overflower 01.bc
 
-When you have successfully completed the project, running the overflower as
-above should print the results in CSV format. The file should be formatted as
-follows:
+Running the buffer overflow detector as above should print the results in CSV format, where the meaning of each column is:
 
     <Context>, <Function of access>, <Line of access>, <Size of buffer>, <Possible range for access>
 
